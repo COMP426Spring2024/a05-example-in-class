@@ -34,6 +34,10 @@ export class Ingredient {
         });
     }
 
+    static deleteIngredientByID(id) {
+        Recipe.#all_ingredients = Recips.#all_ingredients.filter((i) => i.getID() == id);
+    }
+
     json() {
         return {
             id: this.#id,
