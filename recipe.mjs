@@ -1,3 +1,4 @@
+import {db} from "./db.mjs";
 import { Ingredient} from "./ingredient.mjs";
 import {Step} from "./step.mjs";
 export class Recipe {
@@ -6,16 +7,13 @@ export class Recipe {
     #name
     #steps
 
-    static #next_id = 1;
-    static #all_recipes = [];
-
     constructor (id, name, steps) {
         this.#id = id;
         this.#name = name;
         this.#steps = steps;
     }
 
-    static create(data) {
+    static async create(data) {
         if ((data == undefined) || (!data instanceof Object) 
         || (data.name == undefined) 
         || (typeof data.name != 'string')) {
@@ -26,72 +24,101 @@ export class Recipe {
             return null;
         }
 
-        if (data.steps.find((s) => {
-            let found_invalid = true;
+        for (let i=0; i<data.steps.length; i++) {
+            let s = data.steps[i];
+
             if (!s instanceof Object) {
-                return found_invalid;
+                return null;
             }
             if (!s.seq_no) {
-                return found_invalid;
+                return null;
             }
             if (typeof s.seq_no != 'number') {
-                return found_invalid;
+                return null;
             }
             if (!s.instruction) {
-                return found_invalid;
+                return null;
             }
             if (typeof s.instruction != 'string') {
-                return found_invalid;
+                return null;
             }
             if (!s.ingredients) {
-                return found_invalid;
+                return null;
             }
             if (!Array.isArray(s.ingredients)) {
-                return found_invalid;
-            }
-            // Check to see if all of the ingredients
-            // referenced by this step exist.
-            if (s.ingredients.find((i) => !Ingredient.findByID(i))) {
-                return found_invalid``
+                return null;
             }
 
-            // All looks good with this step.
-            return !found_invalid;
-        })) {
-            // Found an invalid step, return null for failure.
+            for (let i=0; i<s.ingredients.length; i++) {
+                let iid = s.ingredients[i];
+                if (! await Ingredient.findByID(iid)) {
+                    return null;
+                }
+            }
+        }
+
+        let id;
+        try {
+            let db_result = await db.run('insert into recipes values (NULL, ?)', data.name);
+            id = db_result.lastID;
+        } catch (e) {
             return null;
         }
 
-        // Make the steps. Data already validated.
-        let steps = data.steps.map((s) => Step.create(s));
+        // Make the steps.
 
-        let id = Recipe.#next_id++;
+        let steps = [];
+        for (let i=0; i<data.steps.length; i++) {
+            data.steps[i].recipe_id = id;
+            steps.push(await Step.create(data.steps[i]));
+        }
+
         let recipe = new Recipe(id, data.name, steps);
-        Recipe.#all_recipes.push(recipe);
         return recipe;
     }
 
-    static getAllIDs() {
-        return Recipe.#all_recipes.map((r) => r.getID());
+    static async getAllIDs() {
+        try {
+            let rows = await db.all('select id from recipes');
+            return rows.map(r => r.id);
+        } catch (e) {
+            return [];
+        }
     }
 
-    static findByID(id) {
-        return Recipe.#all_recipes.find((r) => {
-            return r.getID() == id;
-        });
+    static async findByID(id) {
+        try {
+            let row = await db.get('select * from recipes where id = ?', id);
+            if (!row) {
+                return null;
+            }
+            let name = row.name;
+            // Need step objects.
+            let step_ids = (await db.all('select id from steps where recipe_id = ?', id)).map(s => s.id);
+            let steps = [];
+            for (let i=0; i<step_ids.length; i++) {
+                steps.push(await Step.findByID(step_ids[i]));
+            }
+            return new Recipe(id, name, steps);
+        } catch (e) {
+            return null;
+        }
     }
 
-    static deleteRecipeByID(id) {
-        Recipe.#all_recipes = Recips.#all_recipes.filter((r) => r.getID() == id);
+    static async deleteRecipeByID(id) {
+        try {
+            // First delete the steps.
+            await db.run('delete from steps where recipe_id = ?', id);
+
+            // Then delete the recipe.
+            await db.run('delete from recipes where id = ?', id);
+        } catch (e) {
+            return false;
+        }
+        return true;
     }
 
-    static isIngredientInUse(iid) {
-        return Recipe.#all_recipes.find((r) => {
-            return r.getIngredientIDs.find((i) => i == iid);
-        });
-    }
-
-    json(expanded) {
+    async json(expanded) {
         let ingredient_ids = [];
         this.#steps.forEach((s) => {
             s.getIngredientIDs().forEach((iid) => {
@@ -107,7 +134,14 @@ export class Recipe {
         }
 
         if (expanded) {
-            recipe_json.ingredients = ingredient_ids.map((iid) => Ingredient.findByID(iid).json());
+            // Can't use Ingredient.findByID in map because it is async
+            // recipe_json.ingredients = ingredient_ids.map((iid) => Ingredient.findByID(iid).json());
+
+            recipe_json.ingredients = [];
+            for (let i=0; i<ingredient_ids.length; i++) {
+                let iid = ingredient_ids[i];
+                recipe_json.ingredients.push((await Ingredient.findByID(iid)).json());
+            }
             recipe_json.steps = this.#steps.map((s) => s.json());
         } else {
             recipe_json.ingredient_count = ingredient_ids.length;
@@ -120,7 +154,12 @@ export class Recipe {
         return this.#id;
     }
 
-    setName(new_name) {
-        this.#name = new_name;
+    async setName(new_name) {
+        try {
+            await db.run('update recipes set name = ? where id = ?', new_name, this.getID());
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 }

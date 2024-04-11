@@ -9,12 +9,12 @@ const port = 3000;
 
 app.use(bodyParser.json());
 
-app.get('/ingredients', (req, res) => {
-    res.json(Ingredient.getAllIDs());
+app.get('/ingredients', async (req, res) => {
+    res.json(await Ingredient.getAllIDs());
 });
 
-app.get('/ingredients/:id', (req, res) => {
-    let ing = Ingredient.findByID(req.params.id);
+app.get('/ingredients/:id', async (req, res) => {
+    let ing = await Ingredient.findByID(req.params.id);
     if (!ing) {
         res.status(404).send("Ingredient not found");
         return;
@@ -22,9 +22,9 @@ app.get('/ingredients/:id', (req, res) => {
     res.json(ing.json());
 });
 
-app.post('/ingredients', (req, res) => {
+app.post('/ingredients', async (req, res) => {
 
-    let ing = Ingredient.create(req.body);
+    let ing = await Ingredient.create(req.body);
 
     if (!ing) {
         res.status(400).send("Bad request");
@@ -34,8 +34,8 @@ app.post('/ingredients', (req, res) => {
     res.status(201).json(ing.json());
 })
 
-app.put('/ingredients/:id', (req, res) => {
-    let ing = Ingredient.findByID(req.params.id);
+app.put('/ingredients/:id', async (req, res) => {
+    let ing = await Ingredient.findByID(req.params.id);
     if (!ing) {
         res.status(404).send("Ingredient not found.");
         return;
@@ -46,47 +46,46 @@ app.put('/ingredients/:id', (req, res) => {
         return;
     }
 
-    ing.setName(req.body.name);
+    await ing.setName(req.body.name);
     res.json(true);
 })
 
-app.delete('/ingredients/:id', (req, res) => {
-    if (Recipe.isIngredientInUse(req.params.id)) {
+app.delete('/ingredients/:id', async (req, res) => {
+    if (!await Ingredient.deleteIngredientByID(req.params.id)) {
         res.status(400).send("Ingredient is still in use");
         return;
     } 
-    Ingredient.deleteIngredientByID(req.params.id);
     res.json(true);
 })
 
-app.get('/recipes', (req, res) => {
-    res.json(Recipe.getAllIDs());
+app.get('/recipes', async (req, res) => {
+    res.json(await Recipe.getAllIDs());
 });
 
-app.get('/recipes/:id', (req, res) => {
-    let recipe = Recipe.findByID(req.params.id);
+app.get('/recipes/:id', async (req, res) => {
+    let recipe = await Recipe.findByID(req.params.id);
     if (!recipe) {
         res.status(404).send("Recipe not found");
         return;
     }
 
-    res.json(recipe.json(req.query.expanded != undefined));
+    res.json(await recipe.json(req.query.expanded != undefined));
 });
 
-app.post('/recipes', (req, res) => {
+app.post('/recipes', async (req, res) => {
 
-    let recipe = Recipe.create(req.body);
+    let recipe = await Recipe.create(req.body);
 
     if (!recipe) {
         res.status(400).send("Bad request");
         return;
     }
 
-    res.status(201).json(recipe.json(true));
+    res.status(201).json(await recipe.json(true));
 });
 
-app.put('/recipes/:id', (req, res) => {
-    let recipe = Recipe.findByID(req.params.id);
+app.put('/recipes/:id', async (req, res) => {
+    let recipe = await Recipe.findByID(req.params.id);
     if (!recipe) {
         res.status(404).send("Recipe not found.");
         return;
@@ -97,19 +96,19 @@ app.put('/recipes/:id', (req, res) => {
         return;
     }
 
-    recipe.setName(req.body.name);
+    await recipe.setName(req.body.name);
     res.json(true);
 });
 
-app.delete('/recipes/:id', (req, res) => {
-    Recipe.deleteRecipeByID(req.params.id);
+app.delete('/recipes/:id', async (req, res) => {
+    await Recipe.deleteRecipeByID(req.params.id);
     res.json(true);
 });
 
-Ingredient.create({name: "chicken"});
-Ingredient.create({name: "lemon"});
-Ingredient.create({name: "wine"});
-Recipe.create({
+await Ingredient.create({name: "chicken"});
+await Ingredient.create({name: "lemon"});
+await Ingredient.create({name: "wine"});
+await Recipe.create({
     name: 'Chicken Picatta',
     steps: [
         {
