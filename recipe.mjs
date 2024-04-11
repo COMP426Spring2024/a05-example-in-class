@@ -82,7 +82,7 @@ export class Recipe {
     }
 
     static deleteRecipeByID(id) {
-        Recipe.#all_recipes = Recips.#all_recipes.filter((r) => r.getID() == id);
+        Recipe.#all_recipes = Recipe.#all_recipes.filter((r) => r.getID() !== id);
     }
 
     static isIngredientInUse(iid) {
