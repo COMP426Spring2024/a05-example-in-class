@@ -11,7 +11,7 @@ export class Step {
         this.#id = id;
         this.#seq_no = seq_no;
         this.#instruction = instruction;
-        this.#ingredients = ingredients;
+        this.#ingredients = [...ingredients];
     }
 
     static create(data) {
@@ -27,7 +27,7 @@ export class Step {
             id: this.#id,
             seq_no: this.#seq_no,
             instruction: this.#instruction,
-            ingredients: [...this.#ingredients]
+            ingredients: this.getIngredientIDs()
         }
     }
 
